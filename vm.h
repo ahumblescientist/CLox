@@ -17,12 +17,12 @@ typedef enum {
 	INTERPRET_OK,
 	INTERPRET_COMPILE_ERROR,
 	INTERPRET_RUNTIME_ERROR
-} InterpreterResult;
+} InterpretResult;
 
 void push(Value);
 Value pop();
 void initVM();
 void freeVM();
-InterpreterResult interpret(Chunk *);
+InterpretResult interpret(char *);
 
 #endif

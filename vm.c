@@ -1,4 +1,5 @@
 #include "vm.h"
+#include "compiler.h"
 
 VM vm;
 
@@ -25,7 +26,7 @@ void initVM() {
 void freeVM() {
 }
 
-static InterpreterResult run() {
+static InterpretResult run() {
 #define READ_BYTE() (*vm.ip++)
 #define READ_CONSTANT() (vm.chunk->varr.values[*vm.ip++])
 #define BINARY_OP(op) do {\
@@ -66,8 +67,7 @@ static InterpreterResult run() {
 #undef BINARY_OP
 }
 
-InterpreterResult interpret(Chunk *chunk) {
-	vm.chunk = chunk;
-	vm.ip = vm.chunk->code;
-	return run();
+InterpretResult interpret(char *source) {
+	compile(source);
+	return INTERPRET_OK; 
 }
