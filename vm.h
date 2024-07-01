@@ -5,13 +5,15 @@
 #include "chunk.h"
 #include "value.h"
 
-
 typedef struct {
 	Chunk *chunk;
 	uint8_t *ip;
 	Value stack[256];
 	Value *stackTop;
+	Obj *objects;
 } VM;
+
+extern VM vm;
 
 typedef enum {
 	INTERPRET_OK,

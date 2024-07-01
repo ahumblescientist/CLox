@@ -1,12 +1,12 @@
 #include "vm.h"
 #include "compiler.h"
-
 #include <stdarg.h>
-
-VM vm;
+#include <string.h>
+#include "memory.h"
 
 #define TRACE_STACK
-#undef TRACE_STACK
+
+VM vm;
 
 static void resetStack() {
 	vm.stackTop = vm.stack;
@@ -29,12 +29,30 @@ static bool isTrue(Value v) {
 	return (v.type != VAL_NIL && (v.type != VAL_BOOL || AS_BOOL(v)));
 }
 
+static void concatenate() {
+	ObjString *b = AS_STRING(pop());
+	ObjString *a = AS_STRING(pop());
+	int length = a->length + b->length;
+	char *chars = ALLOCATE(char, length+1);
+	memcpy(chars, a->chars, a->length);
+	memcpy(chars + a->length, b->chars, b->length);
+	chars[length] = '\0';
+	ObjString *result = takeString(chars, length);
+	push(OBJ_VAL((Obj*)result));
+}
+
 static bool valuesEqual(Value a, Value b) {
 	if(a.type != b.type) return false;
 	switch(a.type) {
 		case VAL_BOOL: return AS_BOOL(a) == AS_BOOL(b);
 		case VAL_NIL: return true;
 		case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
+		case VAL_OBJ: {
+			ObjString *s1 = AS_STRING(a);
+			ObjString *s2 = AS_STRING(b);
+			if(s1->length != s2->length) return false;
+			return (memcmp(s1->chars, s2->chars, s1->length) == 0);
+		}
 		default: return false;
 	}
 }
@@ -52,10 +70,12 @@ static void runtimeError(char *format, ...) {
 }
 
 void initVM() {
+	vm.objects = NULL;
 	resetStack();
 }
 
 void freeVM() {
+	freeObjects();
 }
 
 static InterpretResult run() {
@@ -97,7 +117,17 @@ static InterpretResult run() {
 				push(NUMBER_VAL(-AS_NUMBER(T)));
 				break;
 			}
-			case OP_ADD: 			BINARY_OP(NUMBER_VAL, +); break;
+			case OP_ADD: {
+				if(IS_STRING(peek(0)) && IS_STRING(peek(1))) {
+					concatenate();
+				} else if(IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
+					BINARY_OP(NUMBER_VAL, +);
+				} else {
+					runtimeError("Operands must be numebrs or strings.");
+					return INTERPRET_RUNTIME_ERROR;
+				}
+				break;
+			}
 			case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, -); break;
 			case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *); break;
 			case OP_DIVIDE: 	BINARY_OP(NUMBER_VAL, /); break;
