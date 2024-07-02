@@ -2,6 +2,7 @@
 #define OBJ_H
 
 #include "value.h"
+#include <stdint.h>
 
 
 #define OBJ_TYPE(v) (AS_OBJ(v)->type)
@@ -28,8 +29,8 @@ struct ObjString {
 	Obj *obj;
 	int length;
 	char *chars;
+	uint32_t hash;
 };
-
 
 Obj *allocateObject(size_t, ObjType);
 

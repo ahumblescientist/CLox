@@ -47,12 +47,7 @@ static bool valuesEqual(Value a, Value b) {
 		case VAL_BOOL: return AS_BOOL(a) == AS_BOOL(b);
 		case VAL_NIL: return true;
 		case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
-		case VAL_OBJ: {
-			ObjString *s1 = AS_STRING(a);
-			ObjString *s2 = AS_STRING(b);
-			if(s1->length != s2->length) return false;
-			return (memcmp(s1->chars, s2->chars, s1->length) == 0);
-		}
+		case VAL_OBJ: return AS_OBJ(a) == AS_OBJ(b);
 		default: return false;
 	}
 }
@@ -71,10 +66,12 @@ static void runtimeError(char *format, ...) {
 
 void initVM() {
 	vm.objects = NULL;
+	initTable(&vm.strings);
 	resetStack();
 }
 
 void freeVM() {
+	freeTable(&vm.strings);
 	freeObjects();
 }
 

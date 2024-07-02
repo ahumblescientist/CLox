@@ -2,6 +2,7 @@
 #define VM_H
 
 #include <stdint.h>
+#include "table.h"
 #include "chunk.h"
 #include "value.h"
 
@@ -11,6 +12,7 @@ typedef struct {
 	Value stack[256];
 	Value *stackTop;
 	Obj *objects;
+	Table strings;
 } VM;
 
 extern VM vm;
