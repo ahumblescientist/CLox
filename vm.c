@@ -5,6 +5,7 @@
 #include "memory.h"
 
 #define TRACE_STACK
+#undef TRACE_STACK
 
 VM vm;
 
@@ -175,6 +176,16 @@ static InterpretResult run() {
 				break;
 			}
 			case OP_POP: pop(); break;
+			case OP_GET_LOCAL: {
+				int index = READ_BYTE();
+				push(vm.stack[index]);
+				break;
+			}
+			case OP_SET_LOCAL: {
+				int index = READ_BYTE();
+				vm.stack[index] = pop();
+				break;
+			}
 		}
 	}
 #undef READ_BYTE
