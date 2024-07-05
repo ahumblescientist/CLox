@@ -79,6 +79,7 @@ void freeVM() {
 
 static InterpretResult run() {
 #define READ_BYTE() (*vm.ip++)
+#define READ_SHORT() (((uint16_t)READ_BYTE() << 8) | (uint16_t)READ_BYTE())
 #define READ_CONSTANT() (vm.chunk->varr.values[*vm.ip++])
 #define READ_STRING() (AS_STRING(READ_CONSTANT()))
 #define BINARY_OP(valueType, op) do {\
@@ -186,12 +187,26 @@ static InterpretResult run() {
 				vm.stack[index] = pop();
 				break;
 			}
+			case OP_JUMP_IF_FALSE: {
+				Value condition = peek(0);
+				uint16_t offset = READ_SHORT();
+				if(!isTrue(condition)) {
+					vm.ip += offset;
+				}
+				break;
+			}
+			case OP_JUMP: {
+				uint16_t offset = READ_SHORT();
+				vm.ip += offset;
+				break;
+			}
 		}
 	}
 #undef READ_BYTE
 #undef READ_CONSTANT
 #undef BINARY_OP
 #undef READ_STRING
+#undef READ_SHORT
 }
 
 InterpretResult interpret(char *source) {

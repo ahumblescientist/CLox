@@ -96,7 +96,7 @@ static void skipWhiteSpaces() {
 
 static Token string() {
 	while(peek() != '"') {
-		if(isAtEnd()) return errorToken("unterminated strnig");
+		if(isAtEnd()) return errorToken("unterminated string");
 		if(peek() == '\n') scanner.line++;
 		advance();
 	}

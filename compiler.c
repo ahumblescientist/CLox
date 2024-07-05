@@ -51,8 +51,10 @@ typedef struct {
 } ParseRule;
 
 
-static void binary(bool), grouping(bool), unary(bool), number(bool), literal(bool), string(bool), variable(bool);
-static void expression(), decleration();
+static void binary(bool), grouping(bool), unary(bool), number(bool), literal(bool), string(bool), variable(bool), and_(bool),
+or_(bool);
+static int emitJump(uint8_t);
+static void expression(), decleration(), statement(), patchJump(int);
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 ParseRule rules[] = {
@@ -78,7 +80,7 @@ ParseRule rules[] = {
   [TOKEN_IDENTIFIER]    = {variable,     NULL,   PREC_NONE},
   [TOKEN_STRING]        = {string,     NULL,   PREC_NONE},
   [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE},
-  [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_AND]           = {NULL,     and_,   PREC_AND},
   [TOKEN_CLASS]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_ELSE]          = {NULL,     NULL,   PREC_NONE},
   [TOKEN_FALSE]         = {literal,     NULL,   PREC_NONE},
@@ -86,7 +88,7 @@ ParseRule rules[] = {
   [TOKEN_FUN]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_IF]            = {NULL,     NULL,   PREC_NONE},
   [TOKEN_NIL]           = {literal,     NULL,   PREC_NONE},
-  [TOKEN_OR]            = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_OR]            = {NULL,     or_,   PREC_OR},
   [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
   [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
@@ -300,6 +302,24 @@ static void binary(bool canAssign) {
 	}
 }
 
+static void and_(bool canAssign) {
+  int jump = emitJump(OP_JUMP_IF_FALSE);
+  emitByte(OP_POP);
+  parsePrecedence(PREC_AND);
+  patchJump(jump);
+}
+
+static void or_(bool canAssign) {
+  // since (x or y) == !(!x and !y), De'morgans law bro
+  emitByte(OP_NOT);
+  int jump = emitJump(OP_JUMP_IF_FALSE);
+  emitByte(OP_POP);
+  parsePrecedence(PREC_OR);
+  emitByte(OP_NOT);
+  patchJump(jump);
+  emitByte(OP_NOT);
+}
+
 
 static void expression() {
   parsePrecedence(PREC_ASSIGNMENT);	
@@ -336,6 +356,37 @@ static void endScope() {
   }
 }
 
+static int emitJump(uint8_t instruction) {
+  emitByte(instruction);
+  emitBytes(0xff, 0xff);
+  return currentChunk()->count - 2;
+}
+
+static void patchJump(int index) {
+  int jump = currentChunk()->count - index - 2;
+  if(jump > UINT16_MAX) {
+    error("Too much to jump over.");
+  }
+  currentChunk()->code[index] = (jump >> 8) & 0xff;
+  currentChunk()->code[index+1] = jump & 0xff;
+
+}
+
+static void ifStatement() {
+  consume(TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
+  expression();
+  consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
+  int thenJump = emitJump(OP_JUMP_IF_FALSE);
+  emitByte(OP_POP);
+  statement();
+  int elseJump = emitJump(OP_JUMP);
+  patchJump(thenJump);
+  emitByte(OP_POP);
+  if(match(TOKEN_ELSE)) statement();
+  patchJump(elseJump);
+}
+
+
 static void statement() {
   if(match(TOKEN_PRINT)) {
     printStatement();
@@ -343,6 +394,8 @@ static void statement() {
     beginScope();
     block();
     endScope();
+  } else if(match(TOKEN_IF)) {
+    ifStatement();
   } else {
     expressionStatement();
   }
