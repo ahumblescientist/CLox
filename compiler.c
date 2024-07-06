@@ -54,7 +54,7 @@ typedef struct {
 static void binary(bool), grouping(bool), unary(bool), number(bool), literal(bool), string(bool), variable(bool), and_(bool),
 or_(bool);
 static int emitJump(uint8_t);
-static void expression(), decleration(), statement(), patchJump(int);
+static void expression(), decleration(), statement(), patchJump(int), varDecleration();
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 ParseRule rules[] = {
@@ -386,6 +386,68 @@ static void ifStatement() {
   patchJump(elseJump);
 }
 
+static void emitLoop(int loopStart) {
+  emitByte(OP_LOOP);
+  int offset = currentChunk()->count - loopStart + 2;
+  if(offset > UINT16_MAX) error("Loop body too large.");
+  emitByte((offset >> 8) & 0xff);
+  emitByte(offset & 0xff);
+}
+
+static void whileStatement() {
+  int loopStart = currentChunk()->count; // before jump so it goes to jump
+  consume(TOKEN_LEFT_PAREN, "Expect '(' after 'while'.");
+  expression();
+  consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
+  int exitJump = emitJump(OP_JUMP_IF_FALSE);
+  emitByte(OP_POP);
+  statement();
+  emitLoop(loopStart);
+  patchJump(exitJump);
+  emitByte(OP_POP);
+}
+
+static void forStatement() {
+  beginScope();
+  consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
+  if(match(TOKEN_SEMICOLON)) {
+    
+  } else if(match(TOKEN_VAR)) {
+    varDecleration();
+  } else {
+    expressionStatement(); // pop the value after setting it (or after any other type of expression)
+  }
+  int loopStart = currentChunk()->count;
+  int exitJump = -1;
+  if(!match(TOKEN_SEMICOLON)) {
+    expression(); 
+    consume(TOKEN_SEMICOLON, "Expect ';' after condition.");
+    exitJump = emitJump(OP_JUMP_IF_FALSE);
+    emitByte(OP_POP);
+  } else {
+    emitByte(OP_TRUE);
+    exitJump = emitJump(OP_JUMP_IF_FALSE);
+    emitByte(OP_POP);
+  }
+  if(!match(TOKEN_RIGHT_PAREN)) {
+    int bodyJump = emitJump(OP_JUMP);
+    int incrementJump = currentChunk()->count;
+    expression();
+    emitByte(OP_POP);
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
+    emitLoop(loopStart);
+    loopStart = incrementJump; // add loop to increment statement
+    patchJump(bodyJump);
+  }
+  statement();
+  emitLoop(loopStart);
+  if(exitJump != -1) {
+    patchJump(exitJump);
+    emitByte(OP_POP);
+  }
+  endScope();
+}
+
 
 static void statement() {
   if(match(TOKEN_PRINT)) {
@@ -396,6 +458,10 @@ static void statement() {
     endScope();
   } else if(match(TOKEN_IF)) {
     ifStatement();
+  } else if(match(TOKEN_WHILE)) {
+    whileStatement();
+  } else if(match(TOKEN_FOR)) {
+    forStatement();
   } else {
     expressionStatement();
   }
@@ -483,7 +549,7 @@ static void namedVariable(Token name, bool canAssign) {
   int arg = resloveLocal(current, &name);
   if(arg != -1) {
     getOp = OP_GET_LOCAL;
-    setOp = OP_GET_LOCAL;
+    setOp = OP_SET_LOCAL;
   } else {
     arg = identifierConstant(&name);
     getOp = OP_GET_GLOBAL;

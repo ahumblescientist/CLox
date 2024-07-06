@@ -184,7 +184,7 @@ static InterpretResult run() {
 			}
 			case OP_SET_LOCAL: {
 				int index = READ_BYTE();
-				vm.stack[index] = pop();
+				vm.stack[index] = peek(0);
 				break;
 			}
 			case OP_JUMP_IF_FALSE: {
@@ -200,6 +200,12 @@ static InterpretResult run() {
 				vm.ip += offset;
 				break;
 			}
+			case OP_LOOP: {
+				uint16_t offset = READ_SHORT();
+				vm.ip -= offset;
+				break;
+			}
+
 		}
 	}
 #undef READ_BYTE
